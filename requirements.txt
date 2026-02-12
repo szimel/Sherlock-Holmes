@@ -1,8 +1,8 @@
-fastapi
-uvicorn[standard]
-librosa
-soundfile
-tempfile
-numpy
-scipy
-python-multipart
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.6
+librosa==0.10.1
+soundfile==0.12.1
+numpy==1.26.3
+scipy==1.12.0
+resampy==0.4.2
