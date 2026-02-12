@@ -9,12 +9,11 @@ FROM python:3.11-slim
 # though we aim to skip compilation.
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
- ffmpeg \
- libsndfile1 \
-
- <!-- build-essential \
- python3-dev \
- gfortran \ -->
+ffmpeg \
+libsndfile1 \
+# build-essential \
+# python3-dev \
+# gfortran \ 
 
 && rm -rf /var/lib/apt/lists/\*
 
