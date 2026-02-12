@@ -11,10 +11,12 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
  ffmpeg \
  libsndfile1 \
- build-essential \
+
+ <!-- build-essential \
  python3-dev \
- gfortran \
- && rm -rf /var/lib/apt/lists/\*
+ gfortran \ -->
+
+&& rm -rf /var/lib/apt/lists/\*
 
 WORKDIR /app
 
