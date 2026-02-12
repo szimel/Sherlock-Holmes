@@ -1,6 +1,8 @@
 fastapi
 uvicorn[standard]
 librosa
+soundfile
+tempfile
 numpy
 scipy
 python-multipart
