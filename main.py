@@ -40,7 +40,7 @@ app.add_middleware(
 @app.get("/health")
 def health_check():
     """Simple endpoint to verify the server is alive."""
-    return {"status": "healthy", "service": "audio-analyzer"}
+    return {"status": "healthy"}
 
 
 def require_api_key(x_api_key: str = Header(None)):
