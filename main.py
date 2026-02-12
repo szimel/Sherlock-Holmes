@@ -77,7 +77,7 @@ async def analyze(file: UploadFile = File(...)):
             all_chroma = []
             all_1D_data = []
             all_cqt = []
-            block_samples = sr_original * 15 # 15 second blocks for processing
+            block_samples = sr_original * 5 # scared of that 500mb
 
             # Stream through file w/ soundfile
             with sf.SoundFile(tmp_path) as f:
@@ -128,6 +128,8 @@ async def analyze(file: UploadFile = File(...)):
                 seconds=2,
                 include_no_chord=True
             )
+
+            gc.collect() # Final cleanup before returning data
             return {
                 "file_name": file.filename,
                 "duration": float(total_duration),
