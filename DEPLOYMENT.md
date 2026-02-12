@@ -1,33 +1,36 @@
-# Use a slim image to save RAM
+# Use Python 3.11 as it has the best "pre-compiled" support for your pinned libraries
 
 FROM python:3.11-slim
 
-# Install system dependencies for audio processing
+# Install system dependencies
 
-# 'libsndfile1' is mandatory for the 'soundfile' library
+# Added 'gfortran', 'build-essential', and 'python3-dev' JUST in case,
+
+# though we aim to skip compilation.
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
  ffmpeg \
  libsndfile1 \
+ build-essential \
+ python3-dev \
+ gfortran \
  && rm -rf /var/lib/apt/lists/\*
 
 WORKDIR /app
 
-# Install Python dependencies
+# Upgrade pip to ensure it looks for the latest wheels
 
-# Using --no-cache-dir saves disk space and small amounts of RAM during build
+RUN pip install --upgrade pip
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your code
+# Use --prefer-binary to force pip to use pre-compiled versions
+
+# instead of trying to build from source
+
+RUN pip install --no-cache-dir --prefer-binary -r requirements.txt
 
 COPY . .
 
-# Railway provides the port via an environment variable
-
 ENV PORT=8080
-
-# Use a shell-format command to ensure $PORT is properly read
-
 CMD uvicorn main:app --host 0.0.0.0 --port $PORT
