@@ -77,7 +77,7 @@ async def analyze(file: UploadFile = File(...)):
             all_chroma = []
             all_1D_data = []
             all_cqt = []
-            block_samples = sr_original * 5 # scared of that 500mb
+            block_samples = sr_original * 10 # scared of that 500mb
 
             # Stream through file w/ soundfile
             with sf.SoundFile(tmp_path) as f:
