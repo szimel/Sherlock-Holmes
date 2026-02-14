@@ -85,10 +85,6 @@ async def analyze(file: UploadFile = File(...)):
                     y_chunk = np.mean(block, axis=1)
                     y_resampled = librosa.resample(y_chunk, orig_sr=sr_original, target_sr=T_SR) # 11025 scales down data
                     
-                    # creates 3D line animation data
-                    y_visual = librosa.resample(y_resampled, orig_sr=11025, target_sr=1000)
-                    all_1D_data.append(y_visual)
-                    
                     # Only grab harmonics
                     y_harm = librosa.effects.harmonic(y_resampled, margin=3.0)
                     
@@ -108,17 +104,20 @@ async def analyze(file: UploadFile = File(...)):
             # cleanup
             full_chroma = np.concatenate(all_chroma, axis=1)
             full_cqt = np.concatenate(all_cqt, axis=1)
-            full_raw = np.concatenate(all_1D_data)
             os.unlink(tmp_path) # Delete the temp file from disk
             # log scaling for display
             cqt_db = librosa.amplitude_to_db(full_cqt, ref=np.max)    
+            db = cqt_db  # (F,N)
+            db = np.clip(db, -80, 0)
+            spec_u8 = np.round((db + 80) * (255/80)).astype(np.uint8)  # (F,N)
+            payload = spec_u8.T.tolist()
 
             # CHAT's
             C = full_chroma.astype(float)
             C = np.maximum(C, 1e-16)
             
 
-            frame_labels, chord_segments, _debug = testing.decode_chords(
+            _, chord_segments, _debug = testing.decode_chords(
                 C,
                 fps=T_SR/HL,
                 chord_types=("maj", "min"), 
@@ -136,9 +135,7 @@ async def analyze(file: UploadFile = File(...)):
                 "fps": T_SR / HL,
                 "tonal_profile": np.mean(full_chroma, axis=1).tolist(),
                 "time_series_notes": full_chroma.T.tolist(),
-                "spectrogram_data": cqt_db.T.tolist(), # The 84-bin 3D terrain
-                "raw_data": full_raw.tolist(),
-                "c_frame_labels": frame_labels, # len 12 array of which chords 
+                "spectrogram_data": payload,
                 "c_chord_segments": chord_segments,
                 "status": "Success"
             }
