@@ -233,25 +233,3 @@ def decode_chords(C, fps, chord_types=("maj","min"), num_harmonics=4,
     debug = {"criteria_raw": D, "criteria_smooth": Df, "templates": P, "labels": labels, "L": L}
     return frame_labels, segments, debug
 
-def majority_filter_int(arr: np.ndarray, radius: int = 1) -> np.ndarray:
-    """
-    Simple majority filter over integers (helps remove 1-frame spikes).
-    Window size = 2*radius+1. Keeps center value on ties.
-    """
-    n = arr.shape[0]
-    out = arr.copy()
-    for i in range(n):
-        a = max(0, i - radius)
-        b = min(n, i + radius + 1)
-        window = arr[a:b]
-        # bincount requires non-negative ints
-        counts = np.bincount(window)
-        top = np.max(counts) if counts.size else 0
-        winners = np.where(counts == top)[0] if top > 0 else np.array([], dtype=int)
-
-        if winners.size == 1:
-            out[i] = int(winners[0])
-        else:
-            # tie: keep original center value
-            out[i] = int(arr[i])
-    return out
