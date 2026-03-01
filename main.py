@@ -6,7 +6,7 @@ from fastapi import FastAPI, UploadFile, File, Header, Depends, HTTPException, s
 from fastapi.middleware.cors import CORSMiddleware
 import soundfile as sf
 import tempfile
-import testing
+import chord, note
 import asyncio
 import gc
 
@@ -71,13 +71,12 @@ async def analyze(file: UploadFile = File(...)):
             info = sf.info(tmp_path)
             total_duration = info.duration
             sr_original = info.samplerate
-            T_SR = 11025
-            HL = 512
+            T_SR = 11024 * 2.5
+            HL = 1024
 
             all_chroma = []
-            all_1D_data = []
             all_cqt = []
-            block_samples = sr_original * 10 # scared of that 500mb
+            block_samples = sr_original * 15 # scared of that 500mb
 
             # Stream through file w/ soundfile
             with sf.SoundFile(tmp_path) as f:
@@ -88,36 +87,38 @@ async def analyze(file: UploadFile = File(...)):
                     # Only grab harmonics
                     y_harm = librosa.effects.harmonic(y_resampled, margin=3.0)
                     
-                    # decomposes & classifies underlying notes
-                    chroma_chunk = librosa.feature.chroma_cens( # TODO: try .chroma_cens() - more accurate?
+                    # cens seems to do better for note detection
+                    chroma_chunk = librosa.feature.chroma_cens(
                         y=y_harm, 
                         sr=T_SR, 
                         hop_length=HL,
                         n_octaves=7,
                         n_chroma=12,
-                        bins_per_octave=36
+                        bins_per_octave=84 # scared of mb increase cost of this
                     )
-                    all_chroma.append(chroma_chunk)
-                    cqt_chunk = np.abs(librosa.cqt(y=y_harm, sr=T_SR, hop_length=HL, n_bins=84))
+
+                    # CQT for chord detection - seems to do better than chroma for chords, especially with more harmonics
+                    cqt_chunk = librosa.feature.chroma_cqt(y=y_harm, sr=T_SR, hop_length=HL, n_octaves=7, n_chroma=12, bins_per_octave=84)
                     all_cqt.append(cqt_chunk)
+                    # for note detection
+                    all_chroma.append(chroma_chunk)
 
             # cleanup
             full_chroma = np.concatenate(all_chroma, axis=1)
             full_cqt = np.concatenate(all_cqt, axis=1)
             os.unlink(tmp_path) # Delete the temp file from disk
-            # log scaling for display
+
+            # log scaling for spectrogram visualization
             cqt_db = librosa.amplitude_to_db(full_cqt, ref=np.max)    
             db = cqt_db  # (F,N)
             db = np.clip(db, -80, 0)
             spec_u8 = np.round((db + 80) * (255/80)).astype(np.uint8)  # (F,N)
             payload = spec_u8.T.tolist()
-
-            # CHAT's
+            
+						# Get chord segments from chord.py
             C = full_chroma.astype(float)
             C = np.maximum(C, 1e-16)
-            
-
-            _, chord_segments, _debug = testing.decode_chords(
+            _, chord_segments, _ = chord.decode_chords(
                 C,
                 fps=T_SR/HL,
                 chord_types=("maj", "min"), 
@@ -127,16 +128,25 @@ async def analyze(file: UploadFile = File(...)):
                 seconds=2,
                 include_no_chord=True
             )
+            
+            # Get note segments from note.py
+            note_segments = note.get_active_notes(
+                chroma=full_chroma.astype(float),
+                fps=T_SR / HL,
+                max_notes=3,
+                global_thresh=0.45,     # Tweak this to ignore general background noise
+                relative_thresh=0.5,   # Tweak this higher (e.g., 0.7) to be stricter about what counts as a note vs a harmonic
+                min_duration=0.10       # Ignores blips shorter than 100ms
+            )
 
             gc.collect() # Final cleanup before returning data
             return {
                 "file_name": file.filename,
                 "duration": float(total_duration),
                 "fps": T_SR / HL,
-                "tonal_profile": np.mean(full_chroma, axis=1).tolist(),
-                "time_series_notes": full_chroma.T.tolist(),
                 "spectrogram_data": payload,
-                "c_chord_segments": chord_segments,
+                "chord_segments": chord_segments,
+								"note_segments": note_segments,
                 "status": "Success"
             }
             
