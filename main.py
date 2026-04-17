@@ -6,7 +6,7 @@ from fastapi import FastAPI, UploadFile, File, Header, Depends, HTTPException, s
 from fastapi.middleware.cors import CORSMiddleware
 import soundfile as sf
 import tempfile
-import chord, note
+import chord, note, data_transform
 import asyncio
 import gc
 
@@ -184,6 +184,17 @@ async def analyze(file: UploadFile = File(...)):
                 seconds=2,
                 include_no_chord=True
             )
+            
+            _, crystal_animation, _ = chord.decode_chords(
+                C,
+                fps=T_SR/HL,
+                chord_types=('maj', 'min', '7', 'maj7', 'min7', 'dim', 'aug', 'sus2', 'sus4'),
+                num_harmonics=4,
+                measure="KL2",
+                smooth="median",
+                seconds=2,
+                include_no_chord=True
+            )
 
             # Get note segments from note.py
             note_segments = note.get_active_notes(
@@ -194,6 +205,11 @@ async def analyze(file: UploadFile = File(...)):
                 relative_thresh=0.5,    # Tweak this higher (e.g., 0.7) to be stricter about what counts as a note vs a harmonic
                 min_duration=0.10       # Ignores blips shorter than 100ms
             )
+            
+						# so frontend doesn't have to do it
+            parsed_note_segments = data_transform.process_segments(note_segments)
+            parsed_chord_segments = data_transform.process_segments(chord_segments)
+            fingerprint = data_transform.create_fingerprint(note_segments, chord_segments)
 
             gc.collect() # Final cleanup before returning data
             return {
@@ -201,8 +217,9 @@ async def analyze(file: UploadFile = File(...)):
                 "duration": float(total_duration),
                 "fps": T_SR / HL,
                 "spectrogram_data": payload,
-                "chord_segments": chord_segments,
-                "note_segments": note_segments,
+                "parsed_chords": parsed_chord_segments,
+                "parsed_notes": parsed_note_segments,
+                "fingerprint": fingerprint,
                 "status": "Success"
             }
 
